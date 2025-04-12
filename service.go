@@ -28,7 +28,7 @@ type Service struct {
 	handshakeForServerName map[string]HandshakeConfig
 	strictMode             bool
 	wildcardSNI            WildcardSNI
-	handler                N.TCPConnectionHandlerEx
+	handler                Handler
 	logger                 logger.ContextLogger
 }
 
@@ -48,7 +48,7 @@ type ServiceConfig struct {
 	HandshakeForServerName map[string]HandshakeConfig // for protocol version 2/3
 	StrictMode             bool                       // for protocol version 3
 	WildcardSNI            WildcardSNI                // for protocol version 3
-	Handler                N.TCPConnectionHandlerEx
+	Handler                Handler
 	Logger                 logger.ContextLogger
 }
 
@@ -60,6 +60,11 @@ type User struct {
 type HandshakeConfig struct {
 	Server M.Socksaddr
 	Dialer N.Dialer
+}
+
+type Handler interface {
+	N.TCPConnectionHandler
+	E.Handler
 }
 
 func NewService(config ServiceConfig) (*Service, error) {
@@ -95,7 +100,17 @@ func NewService(config ServiceConfig) (*Service, error) {
 	return service, nil
 }
 
-func (s *Service) NewConnection(ctx context.Context, conn net.Conn, source M.Socksaddr, destination M.Socksaddr, onClose N.CloseHandlerFunc) error {
+func (s *Service) selectHandshake(clientHelloFrame *buf.Buffer) HandshakeConfig {
+	serverName, err := extractServerName(clientHelloFrame.Bytes())
+	if err == nil {
+		if customHandshake, found := s.handshakeForServerName[serverName]; found {
+			return customHandshake
+		}
+	}
+	return s.handshake
+}
+
+func (s *Service) NewConnection(ctx context.Context, conn net.Conn, metadata M.Metadata) error {
 	switch s.version {
 	default:
 		fallthrough
@@ -121,8 +136,7 @@ func (s *Service) NewConnection(ctx context.Context, conn net.Conn, source M.Soc
 			return err
 		}
 		s.logger.TraceContext(ctx, "handshake finished")
-		s.handler.NewConnectionEx(ctx, conn, source, destination, onClose)
-		return nil
+		return s.handler.NewConnection(ctx, conn, metadata)
 	case 2:
 		clientHelloFrame, err := extractFrame(conn)
 		if err != nil {
@@ -150,8 +164,7 @@ func (s *Service) NewConnection(ctx context.Context, conn net.Conn, source M.Soc
 		if err == nil {
 			s.logger.TraceContext(ctx, "handshake finished")
 			handshakeConn.Close()
-			s.handler.NewConnectionEx(ctx, bufio.NewCachedConn(newConn(conn), request), source, destination, onClose)
-			return nil
+			return s.handler.NewConnection(ctx, bufio.NewCachedConn(newConn(conn), request), metadata)
 		} else if err == os.ErrPermission {
 			s.logger.WarnContext(ctx, "fallback connection")
 			hashConn.Fallback()
@@ -282,7 +295,6 @@ func (s *Service) NewConnection(ctx context.Context, conn net.Conn, source M.Soc
 			return E.Cause(err, "handshake relay")
 		}
 		s.logger.TraceContext(ctx, "handshake relay finished")
-		s.handler.NewConnectionEx(ctx, bufio.NewCachedConn(newVerifiedConn(conn, hmacAdd, hmacVerify, nil), clientFirstFrame), source, destination, onClose)
-		return nil
+		return s.handler.NewConnection(ctx, bufio.NewCachedConn(newVerifiedConn(conn, hmacAdd, hmacVerify, nil), clientFirstFrame), metadata)
 	}
 }
