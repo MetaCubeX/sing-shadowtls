@@ -1,4 +1,4 @@
-module github.com/sagernet/sing-shadowtls
+module github.com/metacubex/sing-shadowtls
 
 go 1.20
 
