@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	E "github.com/sagernet/sing/common/exceptions"
+	E "github.com/metacubex/sing/common/exceptions"
 )
 
 func copyUntilHandshakeFinished(dst io.Writer, src io.Reader) error {

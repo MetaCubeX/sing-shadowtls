@@ -1,8 +1,8 @@
 package shadowtls
 
 import (
-	"github.com/sagernet/sing/common/buf"
-	"github.com/sagernet/sing/common/bufio"
+	"github.com/metacubex/sing/common/buf"
+	"github.com/metacubex/sing/common/bufio"
 )
 
 type clientConn struct {

@@ -8,8 +8,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/sagernet/sing/common/buf"
-	"github.com/sagernet/sing/common/logger"
+	"github.com/metacubex/sing/common/buf"
+	"github.com/metacubex/sing/common/logger"
 )
 
 func copyUntilHandshakeFinishedV2(ctx context.Context, logger logger.ContextLogger, dst net.Conn, src io.Reader, hash *hashWriteConn, fallbackAfter int) (*buf.Buffer, error) {
