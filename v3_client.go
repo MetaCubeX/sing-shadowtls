@@ -85,7 +85,7 @@ func (w *streamWrapper) Read(p []byte) (n int, err error) {
 			w.readHMAC = hmac.New(sha1.New, []byte(w.password))
 			w.readHMAC.Write(w.serverRandom)
 			w.readHMACKey = kdf(w.password, w.serverRandom)
-			w.isTLS13 = isServerHelloSupportTLS13(buffer[5:])
+			w.isTLS13 = isServerHelloSupportTLS13(buffer)
 			if !w.isTLS13 {
 				w.authorized = true
 			}
@@ -100,6 +100,8 @@ func (w *streamWrapper) Read(p []byte) (n int, err error) {
 				binary.BigEndian.PutUint16(buffer[hmacSize+3:], uint16(len(buffer)-tlsHmacHeaderSize))
 				w.buffer.Advance(hmacSize)
 				w.authorized = true
+			} else {
+				return 0, E.New("shadow-tls v3: hmac mismatch, possible data corruption")
 			}
 		}
 	}
